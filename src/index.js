@@ -1,16 +1,20 @@
 import getNamespace from "./get-namespace"
-import alias from "./alias"
+import createAlias from "./createAlias"
 
 class EventBus {
   constructor () {
     this.events = {}
+    this.offlineStack = {}
   }
 
   listen (key, fn) {
+
+    // 订阅多个事件
     if (Array.isArray(key)) {
       for (let i = 0, l = key.length; i < l; i++) {
         this.listen(key[i], fn)
       }
+      return this
     }
 
     const { namespace, event } = getNamespace(key)
@@ -21,6 +25,20 @@ class EventBus {
       (this.events[namespace][event] = [])
     ).push(fn)
 
+    // 处理离线事件
+    if (
+      this.offlineStack[namespace]?.[event] &&
+      this.offlineStack[namespace][event].length
+    ) {
+      let cbs = this.offlineStack[namespace][event]
+
+      for (let i = 0, l = cbs.length; i < l; i++) {
+        cbs[i]()
+      }
+
+      this.offlineStack[namespace][event] = null
+    }
+
     return this
   }
 
@@ -28,10 +46,16 @@ class EventBus {
     const { namespace, event } = getNamespace(key)
     const cbs = this.events[namespace]?.[event]
 
-    if (cbs) {
-      let i = cbs.length
-
-      while (i--) {
+    if (!cbs) {
+      this.offlineStack[namespace] = this.offlineStack[namespace] || {};
+      (
+        this.offlineStack[namespace][event] || 
+        (this.offlineStack[namespace][event] = [])
+      ).push(() => {
+        this.trigger(key, ...args)
+      })
+    } else {
+      for (let i = 0, l = cbs.length; i < l; i++) {
         cbs[i].call(this, ...args)
       }
     }
@@ -42,17 +66,16 @@ class EventBus {
   one (key, fn) {
     if (Array.isArray(key)) {
       for (let i = 0, l = key.length; i < l; i++) {
-        this.listen(key[i], fn)
+        const k = key[i]
+        const cb = (...args) => {
+          fn.call(this, ...args)
+          this.remove(k, fn)
+        }
+        cb.fn = fn
+    
+        this.listen(k, cb)
       }
     }
-
-    const cb = (...args) => {
-      fn.call(this, ...args)
-      this.remove(key, fn)
-    }
-    cb.fn = fn
-
-    this.listen(key, cb)
   }
 
   remove (key, fn) {
@@ -91,6 +114,6 @@ class EventBus {
   }
 }
 
-alias(EventBus)
+createAlias(EventBus)
 
 export default EventBus

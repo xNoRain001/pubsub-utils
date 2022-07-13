@@ -44,7 +44,7 @@
     };
   };
 
-  var alias = function alias(EventBus) {
+  var createAlias = function createAlias(EventBus) {
     var proto = EventBus.prototype;
     proto.on = proto.listen;
     proto.emit = proto.trigger;
@@ -57,15 +57,21 @@
       _classCallCheck(this, EventBus);
 
       this.events = {};
+      this.offlineStack = {};
     }
 
     _createClass(EventBus, [{
       key: "listen",
       value: function listen(key, fn) {
+        var _this$offlineStack$na;
+
+        // 订阅多个事件
         if (Array.isArray(key)) {
           for (var i = 0, l = key.length; i < l; i++) {
             this.listen(key[i], fn);
           }
+
+          return this;
         }
 
         var _getNamespace = getNamespace(key),
@@ -73,13 +79,29 @@
             event = _getNamespace.event;
 
         this.events[namespace] = this.events[namespace] || {};
-        (this.events[namespace][event] || (this.events[namespace][event] = [])).push(fn);
+        (this.events[namespace][event] || (this.events[namespace][event] = [])).push(fn); // 处理离线事件
+
+        if ((_this$offlineStack$na = this.offlineStack[namespace]) !== null && _this$offlineStack$na !== void 0 && _this$offlineStack$na[event] && this.offlineStack[namespace][event].length) {
+          var cbs = this.offlineStack[namespace][event];
+
+          for (var i = 0, l = cbs.length; i < l; i++) {
+            cbs[i]();
+          }
+
+          this.offlineStack[namespace][event] = null;
+        }
+
         return this;
       }
     }, {
       key: "trigger",
       value: function trigger(key) {
-        var _this$events$namespac;
+        var _this$events$namespac,
+            _this = this;
+
+        for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+          args[_key - 1] = arguments[_key];
+        }
 
         var _getNamespace2 = getNamespace(key),
             namespace = _getNamespace2.namespace,
@@ -87,14 +109,13 @@
 
         var cbs = (_this$events$namespac = this.events[namespace]) === null || _this$events$namespac === void 0 ? void 0 : _this$events$namespac[event];
 
-        if (cbs) {
-          var i = cbs.length;
-
-          for (var _len = arguments.length, args = new Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-            args[_key - 1] = arguments[_key];
-          }
-
-          while (i--) {
+        if (!cbs) {
+          this.offlineStack[namespace] = this.offlineStack[namespace] || {};
+          (this.offlineStack[namespace][event] || (this.offlineStack[namespace][event] = [])).push(function () {
+            _this.trigger.apply(_this, [key].concat(args));
+          });
+        } else {
+          for (var i = 0, l = cbs.length; i < l; i++) {
             var _cbs$i;
 
             (_cbs$i = cbs[i]).call.apply(_cbs$i, [this].concat(args));
@@ -106,26 +127,31 @@
     }, {
       key: "one",
       value: function one(key, fn) {
-        var _this = this;
+        var _this2 = this;
 
         if (Array.isArray(key)) {
+          var _loop = function _loop(i, l) {
+            var k = key[i];
+
+            var cb = function cb() {
+              for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+                args[_key2] = arguments[_key2];
+              }
+
+              fn.call.apply(fn, [_this2].concat(args));
+
+              _this2.remove(k, fn);
+            };
+
+            cb.fn = fn;
+
+            _this2.listen(k, cb);
+          };
+
           for (var i = 0, l = key.length; i < l; i++) {
-            this.listen(key[i], fn);
+            _loop(i, l);
           }
         }
-
-        var cb = function cb() {
-          for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-            args[_key2] = arguments[_key2];
-          }
-
-          fn.call.apply(fn, [_this].concat(args));
-
-          _this.remove(key, fn);
-        };
-
-        cb.fn = fn;
-        this.listen(key, cb);
       }
     }, {
       key: "remove",
@@ -176,7 +202,7 @@
     return EventBus;
   }();
 
-  alias(EventBus);
+  createAlias(EventBus);
 
   return EventBus;
 

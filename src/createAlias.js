@@ -1,4 +1,4 @@
-const alias = (EventBus) => {
+const createAlias = (EventBus) => {
   const proto = EventBus.prototype
 
   proto.on = proto.listen
@@ -7,4 +7,4 @@ const alias = (EventBus) => {
   proto.off = proto.remove
 }
 
-export default alias
+export default createAlias
