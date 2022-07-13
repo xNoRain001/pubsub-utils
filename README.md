@@ -67,7 +67,7 @@ eventBus.off('foo', fn) // 取消 foo 下的 fn 订阅
 ### 支持先发布再订阅
 
 ```javascript
-// 此时还没有对象订阅 foo, 不会派发，当发现有人订阅时会立即发布
+// 此时还没有对象订阅 foo, 不会发布，当发现有人订阅时会立即发布
 eventBus.emit('foo', 1, 2, 3)
 
 // 有对象订阅了 foo, 会立即发布
@@ -76,6 +76,14 @@ eventBus.on('foo', (...args) => {
 })
 ```
 
+### 别名
+
+```javascript
+eventBus.on // <=> eventBus.listen
+eventBus.emit // <=> eventBus.trigger
+eventBus.once // <=> eventBus.one
+eventBus.off // <=> eventBus.remove
+```
 
 
 
